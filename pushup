@@ -17,35 +17,31 @@ def calculate_angle(a,b,c):
     return angle
 
 def add_image(img, masked_img, scale, x_ratio, y_ratio):
-    # I want to put logo on top-left corner, So I create a ROI
+
     rows,cols,channels = masked_img.shape
-    # print(rows,cols)
+
     masked_img = cv2.resize(masked_img,(int(rows*scale), int(cols*scale)))
     rows,cols,channels = masked_img.shape
-    # print(rows,cols)
+
     i_r, i_c, i_ch = img.shape
     
     x_s, y_s = int(i_r*x_ratio),int(i_c*y_ratio)
     roi = img[x_s:x_s + rows, y_s:y_s+cols]
-    # Now create a mask of logo and create its inverse mask also
+
     img2gray = cv2.cvtColor(masked_img,cv2.COLOR_BGR2GRAY)
     ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
     mask_inv = cv2.bitwise_not(mask)
-    # Now black-out the area of logo in ROI
+
     img1_bg = cv2.bitwise_and(roi,roi,mask = mask_inv)
-    # Take only region of logo from logo image.
+
     img2_fg = cv2.bitwise_and(masked_img,masked_img,mask = mask)
-    # Put logo in ROI and modify the main image
-    #print(img1_bg.shape, img2_fg.shape)
+
     dst = cv2.add(img1_bg,img2_fg[:,:,:3])
     
     img[x_s:x_s + rows, y_s:y_s+cols] = dst
     return img
-
-
 cap = cv2.VideoCapture(0)
 
-# Curl counter variables
 counter = 0 
 stage = None
 
@@ -57,19 +53,17 @@ x_s_logo = 0.02
 y_s_logo = 0.9
 
 
-## Setup mediapipe instance
+
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
         ret, frame = cap.read()
         
-        # Recolor image to RGB
+
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image.flags.writeable = False
-      
-        # Make detection
+
         results = pose.process(image)
     
-        # Recolor back to BGR
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         
@@ -77,21 +71,19 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         try:
             landmarks = results.pose_landmarks.landmark
             
-            # Get coordinates
             shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
             elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
             wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
             
-            # Calculate angle
+
             angle = calculate_angle(shoulder, elbow, wrist)
             
-            # Visualize angle
+
             cv2.putText(image, str(angle), 
                            tuple(np.multiply(elbow, [640, 480]).astype(int)), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA
                                 )
             
-            # Curl counter logic
             if angle > 160:
                 stage = "up"
             if angle < 30 and stage =='up':
@@ -102,18 +94,15 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         except:
             pass
         
-        # Render curl counter
-        # Setup status box
         cv2.rectangle(image, (20,30), (220,90), (0,0,0), -1)
         
-        # Rep data
         cv2.putText(image, 'REPS', (15,22), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA)
         cv2.putText(image, str(counter), 
                     (35,80), 
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2, cv2.LINE_AA)
         
-        # Stage data
+
         cv2.putText(image, 'STAGE', (65,22), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA)
         cv2.putText(image, stage, 
@@ -123,7 +112,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         # add logo to img
         image = add_image(image,logo_img,logo_scale, x_s_logo, y_s_logo)
 
-        # break # debug
         
         # Cheer up
         if counter == 5: 
@@ -142,9 +130,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             cv2.putText(image, "Fantastic!", (30,120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2, cv2.LINE_AA)
         
         
-        
-        
-        # Render detections
         mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                 mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2), 
                                 mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2) 
